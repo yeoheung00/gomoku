@@ -1,143 +1,186 @@
 "use client";
 
 import { useEffect, useState, useRef, SubmitEvent } from "react";
-import { io, Socket } from "socket.io-client";
+import { Copy, X, SquarePen, Check } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { socket } from "@/lib/socket";
 
-const SOCKET_URL = "http://localhost:4000";
-
-export default function OmokPage() {
+export default function Page() {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const socketId = useRef<string>("");
-  const [userId, setUserId] = useState("");
-  const [roomId, setRoomId] = useState("");
-  const [rooms, setRooms] = useState<string[]>([]);
+  const [userName, setUserName] = useState("");
+  const [editName, setEditName] = useState("");
+  const [status, setStatue] = useState<"none" | "quick" | "private">("none");
+  const [isEditingName, setIsEditingName] = useState(false);
 
-  const socketRef = useRef<Socket | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
-    const newSocket = io(SOCKET_URL, {
-      transports: ["websocket"],
-      withCredentials: true,
-    });
-    socketRef.current = newSocket;
+    if (!socket.connected) {
+      socket.connect();
+    } else {
+      setTimeout(() => {
+        socketId.current = socket.id ?? "";
+        setIsConnected(true);
+      }, 0);
+    }
 
-    newSocket.on("connect", () => {
-      socketId.current = newSocket.id ?? "";
-      setUserId(socketId.current);
+    socket.on("connect", () => {
+      socketId.current = socket.id ?? "";
       setIsConnected(true);
     });
 
-    newSocket.on("disconnect", () => setIsConnected(false));
-
-    newSocket.on("refreshRooms", (data: { roomIds: string[] }) => {
-      setRooms(data.roomIds);
+    socket.on("initUser", (data: { name: string }) => {
+      setUserName(data.name);
     });
 
+    socket.on("disconnect", () => setIsConnected(false));
+
     return () => {
-      newSocket.removeAllListeners();
-      newSocket.disconnect();
+      socket.removeAllListeners();
+      socket.disconnect();
     };
   }, []);
 
-  const handlerMakeNewRoom = (e: SubmitEvent) => {
-    e.preventDefault();
-    if (!socketRef.current) {
-      console.log("Server error.");
-      return;
-    }
-    const data = new FormData(e.target).get("id")?.toString() ?? "";
-    socketRef.current.emit(
-      "makeRoom",
-      { id: data },
-      (res: { success: boolean; reason: string }) => {
-        if (res.success) {
-          setRoomId(data);
-        } else {
-          console.log("방 생성 실패");
-        }
-      },
-    );
+  useEffect(() => {
+    socket.on("matchSuccess", (data: { roomId: string; color: number }) => {
+      router.push(`/room/${data.roomId}`);
+    });
+  }, [router]);
+
+  const handlerQuick = () => {
+    if (status === "none")
+      socket.emit(
+        "joinMatch",
+        (response: { success: boolean; reason?: string; msg?: string }) => {
+          if (response.success) {
+            console.log(response.msg);
+            setStatue("quick");
+          } else console.log(response.reason);
+        },
+      );
+    else if (status === "quick")
+      socket.emit(
+        "cancelMatch",
+        (response: { success: boolean; reason?: string; msg?: string }) => {
+          if (response.success) {
+            console.log(response.msg);
+            setStatue("none");
+          } else console.log(response.reason);
+        },
+      );
   };
 
-  const handlerExitRoom = () => {
-    socketRef.current?.emit(
-      "exitRoom",
-      { id: roomId },
-      (res: { success: boolean; reason: string }) => {
-        if (res.success) console.log("방 퇴장 성공");
-        else console.log("방 퇴장 실패");
+  const handlerPrivate = () => {
+    setStatue((prev) => (prev === "none" ? "private" : "none"));
+  };
+
+  const handlerEditName = () => {
+    setEditName(userName);
+    setIsEditingName(true);
+  };
+
+  const handlerSaveName = (e: SubmitEvent) => {
+    e.preventDefault();
+    setIsEditingName(false);
+    socket.emit(
+      "updateName",
+      { name: editName },
+      (response: {
+        success: boolean;
+        reason?: string;
+        updatedName?: string;
+      }) => {
+        if (response.success) {
+          const newName = response.updatedName ?? "ERROR";
+          const oldName = userName;
+          setUserName(newName);
+          console.log(`이름 변경 완료: [${oldName}] -> [${newName}]`);
+        } else console.log(response.reason);
       },
     );
-    setRoomId("");
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-100 p-4">
-      <h1 className="mb-2 text-3xl font-bold text-slate-800">
-        ⚔️ 실시간 대전 오목 (Multi-Room)
+    <main className="flex w-full min-h-screen flex-col items-center justify-center p-4">
+      <h1 className="mb-2 text-5xl font-bold text-slate-800">
+        ⚔️ 실시간 대전 오목
       </h1>
 
       {/* 🟢 서버 연결 및 내 돌 색상 정보 */}
-      <div className="mb-2 flex gap-4 text-xs font-mono text-center">
-        <div className={isConnected ? "text-emerald-600" : "text-rose-600"}>
-          ● {isConnected ? "SERVER CONNECTED" : "DISCONNECTED"}
-          <br />
-          User Id : {userId}
-        </div>
-      </div>
-      {roomId === "" ? (
-        <div className="flex flex-col justify-center items-center">
-          <form onSubmit={handlerMakeNewRoom}>
-            <input type="text" name="id" />
-            <button
-              type="submit"
-              className="bg-blue-500 text-white p-2 rounded-lg active:bg-blue-700"
-            >
-              Make new room
+      <div
+        className={`w-full max-w-3xl flex flex-row justify-end text-md text-center ${isConnected ? "text-emerald-600" : "text-rose-600"}`}
+      >
+        ●
+        {isEditingName ? (
+          <form className="flex flex-row gap-2" onSubmit={handlerSaveName}>
+            <input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              name="newName"
+              type="text"
+              className="w-"
+            ></input>
+            <button type="submit">
+              <Check />
             </button>
           </form>
-
-          <div className="flex flex-col w-full p-2">
-            {rooms.map((room, index) => (
-              <div
-                key={index}
-                className="flex flex-row justify-between items-center"
-              >
-                {room}
-                <button
-                  className="bg-green-500 text-white p-2 rounded-lg active:bg-green-700"
-                  onClick={() => {
-                    console.log("방참가 시도", room);
-                    if (socketRef.current)
-                      socketRef.current.emit(
-                        "joinRoom",
-                        { roomId: room },
-                        (res: { success: boolean; reason: string }) => {
-                          if (res.success) {
-                            setRoomId(room);
-                          }
-                          console.log(res.reason);
-                        },
-                      );
-                  }}
-                >
-                  Join
-                </button>
-              </div>
-            ))}
+        ) : (
+          <div className="flex flex-row gap-2">
+            <span>{userName}</span>
+            <button onClick={handlerEditName}>
+              <SquarePen />
+            </button>
           </div>
-        </div>
-      ) : (
-        <div className="flex flex-col">
-          <span className="text-xs text-center">{roomId}</span>
-          <button
-            className="bg-red-500 text-white p-2 rounded-lg active:bg-red-700"
-            onClick={handlerExitRoom}
-          >
-            Exit room
+        )}
+      </div>
+
+      <div className="w-full max-w-3xl gap-4 flex flex-col md:flex-row">
+        {status === "none" ? (
+          <button className="w-full h-20 bg-blue-500" onClick={handlerQuick}>
+            Quick match
           </button>
-        </div>
-      )}
+        ) : (
+          <></>
+        )}
+        {status === "quick" ? (
+          <div className="w-full flex flex-col md:flex-row gap-4">
+            <span className="w-full md:w-fit md:grow h-20 bg-gray-300 text-center leading-20">
+              Matching...
+            </span>
+            <button
+              className="w-full md:w-20 h-20 bg-red-300 flex justify-center items-center"
+              onClick={handlerQuick}
+            >
+              <X size={36} />
+            </button>
+          </div>
+        ) : (
+          <></>
+        )}
+        {status === "none" ? (
+          <button className="w-full h-20 bg-blue-500" onClick={handlerPrivate}>
+            Private game
+          </button>
+        ) : status === "private" ? (
+          <div className="w-full flex flex-col md:flex-row gap-4">
+            <button className="w-full md:w-fit md:grow h-20 bg-blue-500 flex flex-row justify-between items-center leading-20">
+              <span>Link...</span>
+              <div className="w-20 h-20 flex items-center justify-center">
+                <Copy size={36} />
+              </div>
+            </button>
+            <button
+              className="w-full md:w-20 h-20 bg-red-300 flex justify-center items-center"
+              onClick={handlerPrivate}
+            >
+              <X size={36} />
+            </button>
+          </div>
+        ) : (
+          <></>
+        )}
+      </div>
     </main>
   );
 }

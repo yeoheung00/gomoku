@@ -2,7 +2,10 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 
-const divide = () => console.log("------------------");
+const log = (msg: string, data?: any) => {
+  console.log(msg, data ? data : "");
+  console.log("---------------------------------------------");
+};
 
 const app = express();
 const PORT = 4000;
@@ -13,6 +16,8 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST"],
     credentials: true,
   },
+  pingTimeout: 5000, // 💡 클라이언트가 응답하지 않을 때 5초만 기다림
+  pingInterval: 10000, // 💡 10초마다 생존 확인 신호(Ping)를 보냄
 });
 
 const NONE = 0;
@@ -28,81 +33,124 @@ interface GameRoom {
 }
 
 interface User {
-  joinedRoom: number;
+  name: string;
+  joinedRoom: string;
   color: number;
 }
+
+const matchQueue: string[] = [];
 
 const rooms: Record<string, GameRoom> = {};
 const roomIds: string[] = [];
 const players: Record<string, User> = {};
 
-io.on("connection", (socket) => {
-  console.log(`🔌 유저 접속: ${socket.id}`);
-  players[socket.id] = { joinedRoom: 0, color: NONE };
-  console.log("현재 플레이어 목록: ", players);
-  divide();
+const playersDisplay = () => {
+  log("플레이어", players);
+};
 
-  socket.on("makeRoom", (data: { id: string }, callback) => {
-    if (rooms[data.id]) {
-      callback({ success: false, reason: "이미 존재하는 방입니다." });
-    } else {
-      rooms[data.id] = {
+io.on("connection", (socket) => {
+  log(`🔌 유저 접속: ${socket.id}`);
+  players[socket.id] = {
+    name: socket.id.slice(0, 10),
+    joinedRoom: "",
+    color: NONE,
+  };
+  const player = players[socket.id];
+  playersDisplay();
+
+  socket.emit("initUser", { name: player.name });
+
+  socket.on("updateName", (data: { name: string }, callback) => {
+    const newName = data.name.trim();
+    if (!newName)
+      return callback({ success: false, reason: "이름은 공백일 수 없습니다." });
+    if (newName.length > 10)
+      return callback({
+        success: false,
+        reason: "이름은 10자 이하로 설정해주세요.",
+      });
+    const oldName = player.name;
+    player.name = newName;
+    log(`이름 변경 완료: [${oldName}] -> [${newName}]`);
+    playersDisplay();
+    callback({ success: true, updatedName: player.name });
+  });
+
+  socket.on("joinMatch", (callback) => {
+    matchQueue.push(socket.id);
+    if (!matchQueue.includes(socket.id)) {
+      log(`대기열 참가 실패: ${socket.id}`);
+      return callback({ success: false, reason: "대기열 참가 실패" });
+    }
+    log("현대 대기열: ", matchQueue);
+    callback({ success: true, msg: "대기열 참가 성공" });
+
+    if (matchQueue.length >= 2) {
+      const p1Id = matchQueue.shift()!;
+      const p2Id = matchQueue.shift()!;
+      const p1 = players[p1Id];
+      const p2 = players[p2Id];
+
+      const newRoomId = crypto.randomUUID().substring(0, 8);
+
+      rooms[newRoomId] = {
         board: Array(15)
           .fill(null)
           .map(() => Array(15).fill(0)),
         isBlackTurn: true,
         winner: null,
-        players: [socket.id],
+        players: [p1Id, p2Id],
       };
-      roomIds.push(data.id);
-      io.emit("refreshRooms", { roomIds: roomIds });
-      callback({ success: true, reason: "생성 성공" });
-      console.log("현재 존재하는 방: ", rooms);
-      divide();
-    }
-  });
 
-  socket.on("exitRoom", (data: { id: string }, callback) => {
-    const room = rooms[data.id];
-    if (room) {
-      if (room.players.includes(socket.id)) {
-        room.players.splice(room.players.indexOf(socket.id), 1);
+      const random = Math.random() < 0.5;
+      if (p1) {
+        p1.joinedRoom = newRoomId;
+        p1.color = random ? BLACK : WHITE;
       }
+      if (p2) {
+        p2.joinedRoom = newRoomId;
+        p2.color = random ? WHITE : BLACK;
+      }
+
+      io.to(p1Id).emit("matchSuccess", { roomId: newRoomId, color: p1.color });
+      io.to(p2Id).emit("matchSuccess", { roomId: newRoomId, color: p2.color });
+
+      log(`매칭 성사: ${newRoomId}`);
     }
-    if (room.players.length === 0) {
-      delete rooms[data.id];
-      roomIds.splice(roomIds.indexOf(data.id), 1);
-    }
-    io.emit("refreshRooms", { roomIds: roomIds });
-    console.log("현재 존재하는 방: ", rooms);
-    if (callback) callback({ success: true, reason: "퇴장 성공" });
-    divide();
   });
 
-  socket.on("joinRoom", (data: { roomId: string }, callback) => {
-    const room = rooms[data.roomId];
-    if (room) {
-      if (room.players.length < 2) {
-        room.players.push(socket.id);
-        if (callback) callback({ success: true, reason: "방 참가 성공" });
-      } else if (callback)
-        callback({ success: false, reason: "방 참가 실패 인원 초과" });
-    } else if (callback)
-      callback({
-        success: false,
-        reason: `방 참가 실패 [${data.roomId}]방이 존재하지 않음.`,
-      });
+  socket.on("cancelMatch", (callback) => {
+    const index = matchQueue.indexOf(socket.id);
+    if (index !== -1) matchQueue.splice(index, 1);
+    if (matchQueue.includes(socket.id)) {
+      log("대기열 취소 실패: ", socket.id);
+      return callback({ success: false, reason: "대기열 취소 실패" });
+    }
+    log("현재 대기열: ", matchQueue);
+    callback({ success: true, msg: "대기열 취소 성공" });
   });
 
   socket.on("disconnect", () => {
-    console.log(`❌ 유저 퇴장: ${socket.id}`);
+    log(`❌ 유저 퇴장: ${socket.id}`);
     // 관리 편의상 유저가 나갔을 때의 방 비우기 로직은 추후 고도화 예정
-    delete players[socket.id];
-    console.log("현재 플레이어 목록: ", players);
-    divide();
+    if (players[socket.id]) {
+      const switchingName = players[socket.id].name;
+      delete players[socket.id];
+      console.log(`🗑️ 장부 제거 완료: [${switchingName}]`);
+    }
+
+    // 2. 🚶 만약 이 유저가 매칭 대기열(matchQueue)에 들어있던 상태라면 대기열에서도 즉시 투하
+    const queueIndex = matchQueue.indexOf(socket.id);
+    if (queueIndex !== -1) {
+      matchQueue.splice(queueIndex, 1);
+      console.log(
+        `🚨 대기열에서 탈영병 제거 완료 (남은 대기 인원: ${matchQueue.length}명)`,
+      );
+    }
+    playersDisplay();
   });
 });
 
 httpServer.listen(PORT, () => {
-  console.log(`🚀 멀티룸 오목 서버가 구동 중입니다.`);
+  log(`🚀 멀티룸 오목 서버가 구동 중입니다.`);
 });
