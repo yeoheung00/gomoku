@@ -18,11 +18,6 @@ export default function Page() {
   useEffect(() => {
     if (!socket.connected) {
       socket.connect();
-    } else {
-      setTimeout(() => {
-        socketId.current = socket.id ?? "";
-        setIsConnected(true);
-      }, 0);
     }
 
     socket.on("connect", () => {
@@ -34,18 +29,18 @@ export default function Page() {
       setUserName(data.name);
     });
 
-    socket.on("disconnect", () => setIsConnected(false));
-
-    return () => {
-      socket.removeAllListeners();
-      socket.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
     socket.on("matchSuccess", (data: { roomId: string; color: number }) => {
       router.push(`/room/${data.roomId}`);
     });
+
+    socket.on("disconnect", () => setIsConnected(false));
+
+    return () => {
+      socket.off("connect");
+      socket.off("initUser");
+      socket.off("disconnect");
+      socket.off("matchSuccess");
+    };
   }, [router]);
 
   const handlerQuick = () => {

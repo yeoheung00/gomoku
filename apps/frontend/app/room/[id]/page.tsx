@@ -27,6 +27,9 @@ export default function GameRoomPage() {
       <h2 className="text-xl font-bold mb-4">
         대국방 ID: <span className="text-blue-500">{roomId}</span>
       </h2>
+      <div>
+        <h2>{}</h2>
+      </div>
     </div>
   );
 }

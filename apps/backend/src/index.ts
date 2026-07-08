@@ -23,6 +23,7 @@ const io = new Server(httpServer, {
 const NONE = 0;
 const BLACK = 1;
 const WHITE = 2;
+const SPECTATOR = 3;
 
 // 🏢 방별 게임 상태를 저장할 인메모리 데이터베이스 구조
 interface GameRoom {
@@ -30,12 +31,13 @@ interface GameRoom {
   isBlackTurn: boolean;
   winner: string | null;
   players: string[]; // 접속한 유저들의 소켓 ID 목록
+  spectators: string[]; // 관전자들의 소켓 ID 목록
 }
 
 interface User {
   name: string;
   joinedRoom: string;
-  color: number;
+  role: number;
 }
 
 const matchQueue: string[] = [];
@@ -53,7 +55,7 @@ io.on("connection", (socket) => {
   players[socket.id] = {
     name: socket.id.slice(0, 10),
     joinedRoom: "",
-    color: NONE,
+    role: NONE,
   };
   const player = players[socket.id];
   playersDisplay();
@@ -100,6 +102,7 @@ io.on("connection", (socket) => {
         isBlackTurn: true,
         winner: null,
         players: [p1Id, p2Id],
+        spectators: [],
       };
 
       const random = Math.random() < 0.5;
@@ -128,6 +131,18 @@ io.on("connection", (socket) => {
     }
     log("현재 대기열: ", matchQueue);
     callback({ success: true, msg: "대기열 취소 성공" });
+  });
+
+  socket.on("enterRoomPage", (data: { roomId: string }, callback) => {
+    if (!rooms[data.roomId]) {
+      return callback({ success: false, reason: "방이 존재하지 않습니다" });
+    }
+    if (rooms[data.roomId].players[socket.id]) {
+      return callback({ success: false, reason: "이미 방에 입장 중입니다" });
+    }
+    rooms[data.roomId].players[socket.id] = socket.id;
+    callback({ success: true, msg: "방 입장 성공" });
+    socket.join(data.roomId);
   });
 
   socket.on("disconnect", () => {
