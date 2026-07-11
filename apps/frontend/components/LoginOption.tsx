@@ -5,9 +5,7 @@ interface LoginOptionProps {
 export default function LoginOption({ onLogin }: LoginOptionProps) {
   const handleGuestLogin = () => {
     const guestId = `gst_${crypto.randomUUID()}`;
-
     sessionStorage.setItem("mink-gomoku-user-id", guestId);
-
     onLogin(guestId);
   };
   return (

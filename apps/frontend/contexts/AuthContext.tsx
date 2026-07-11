@@ -1,8 +1,17 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
 
 interface AuthContextType {
+  userName: string | null;
+  setName: (name: string) => void;
+  loading: boolean;
   userId: string | null;
   isLogged: boolean;
   login: (id: string) => void;
@@ -11,30 +20,40 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [userId, setUserId] = useState<string | null>(() => {
-    if (typeof window === "undefined") {
-      return null;
-    }
+export default function AuthProvider({ children }: { children: ReactNode }) {
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-    return sessionStorage.getItem("min-gomoku-user-id");
-  });
+  useEffect(() => {
+    const storedUserId = window.sessionStorage.getItem("mink-gomoku-user-id");
+    if (storedUserId) {
+      setUserId(storedUserId);
+    }
+    setLoading(true);
+  }, []);
+
+  const setName = (name: string) => {
+    sessionStorage.setItem("mink-gomoku-user-name", name);
+    setUserName(name);
+  };
 
   const login = (id: string) => {
-    sessionStorage.setItem("min-gomoku-user-id", id);
-
+    sessionStorage.setItem("mink-gomoku-user-id", id);
     setUserId(id);
   };
 
   const logout = () => {
-    sessionStorage.removeItem("min-gomoku-user-id");
-
+    sessionStorage.removeItem("mink-gomoku-user-id");
     setUserId(null);
   };
 
   return (
     <AuthContext.Provider
       value={{
+        userName,
+        setName,
+        loading,
         userId,
         isLogged: userId !== null,
         login,
