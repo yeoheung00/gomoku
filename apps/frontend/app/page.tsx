@@ -5,14 +5,14 @@ import Lobby from "@/components/Lobby";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Page() {
-  const { loading, isLogged, login } = useAuth();
+  const { loading, isLogged} = useAuth();
 
   if (!loading) return null;
 
   return (
-    <main className="w-full max-w-5xl flex flex-col justify-center items-center">
+    <main className="w-full max-w-3xl flex flex-col justify-center items-center">
       <h1 className="text-5xl font-black text-center">⚫️ 오목 ⚪️</h1>
-      {!isLogged ? <LoginOption onLogin={login} /> : <Lobby />}
+      {!isLogged ? <LoginOption /> : <Lobby />}
     </main>
   );
 }

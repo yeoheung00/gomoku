@@ -14,7 +14,6 @@ import { useAuth } from "./AuthContext";
 interface SocketContextType {
   socket: Socket;
   isConnected: boolean;
-  socketId: string | null;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -23,7 +22,6 @@ export default function SocketProvider({ children }: { children: ReactNode }) {
   const { isLogged, userId, loading } = useAuth();
 
   const [isConnected, setIsConnected] = useState(socket.connected);
-  const [socketId, setSocketId] = useState<string | null>(null);
 
   useEffect(() => {
     // AuthContext가 sessionStorage 확인을 끝낼 때까지 대기
@@ -33,14 +31,12 @@ export default function SocketProvider({ children }: { children: ReactNode }) {
       console.log(`🔌 소켓 연결 성공: ${socket.id}`);
 
       setIsConnected(true);
-      setSocketId(socket.id ?? null);
     };
 
     const handleDisconnect = () => {
       console.log("❌ 소켓 연결 해제");
 
       setIsConnected(false);
-      setSocketId(null);
     };
 
     socket.on("connect", handleConnect);
@@ -72,7 +68,6 @@ export default function SocketProvider({ children }: { children: ReactNode }) {
       value={{
         socket,
         isConnected,
-        socketId,
       }}
     >
       {children}
