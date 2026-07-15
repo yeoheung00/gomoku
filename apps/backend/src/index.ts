@@ -15,10 +15,7 @@ const PORT = 4000;
 const httpServer = createServer(app);
 
 // 개발 중인 프론트엔드 주소
-const CLIENT_ORIGINS = [
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-];
+const CLIENT_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"];
 
 // Express HTTP API CORS 설정
 app.use(
@@ -184,6 +181,7 @@ const getAuthenticatedUser = (req: express.Request) => {
 //
 
 app.post("/api/auth/guest", (req, res) => {
+  log("게스트 로그인 요청");
   // 서버 내부에서 사용할 사용자 ID
   const userId = `gst_${crypto.randomUUID()}`;
 
@@ -252,6 +250,7 @@ app.post("/api/auth/guest", (req, res) => {
 //
 
 app.get("/api/auth/me", (req, res) => {
+  log(req.cookies);
   const auth = getAuthenticatedUser(req);
 
   if (!auth) {

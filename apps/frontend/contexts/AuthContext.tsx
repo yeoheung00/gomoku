@@ -12,7 +12,7 @@ interface AuthContextType {
   userName: string | null;
   setUserName: (name: string) => void;
   updateUserName: (name: string) => Promise<void>;
-  loading: boolean;
+  initialized: boolean;
   userId: string | null;
   isLogged: boolean;
   login: (option: string) => Promise<void>;
@@ -24,54 +24,61 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export default function AuthProvider({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+  const initAccount = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/me`, {
+        credentials: "include",
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+
+      setUserId(data.user.id);
+      setUserName(data.user.name);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setInitialized(true);
+    }
+  };
+
   useEffect(() => {
-    const storedUserId = window.sessionStorage.getItem("mink-gomoku-user-id");
-    const storedUserName = window.sessionStorage.getItem("mink-gomoku-user-name");
-    if (storedUserId) {
-      setUserId(storedUserId);
-    }
-    if (storedUserName) {
-      setUserName(storedUserName);
-    }
-    setLoading(true);
+    initAccount();
   }, []);
 
   useEffect(() => {
     if (userId?.startsWith("gst_")) return;
     //TODO: 게스트가 아니라면 유저 이름 DB 수정
-  },[userName])
+  }, [userName]);
 
   const updateUserName = async (name: string) => {
     if (!userId) return;
 
-      const response = await fetch(
-        `${API_URL}/api/users/${userId}/name`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ name }),
-        },
-      );
+    const response = await fetch(`${API_URL}/api/users/me/name`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+      credentials: "include",
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.reason);
-      }
+    if (!response.ok) {
+      throw new Error(data.reason);
+    }
 
-      setUserName(data.userName);
-  }
+    setUserName(data.userName);
+  };
 
   const login = async (option: string) => {
     switch (option) {
       case "guest": {
         const response = await fetch(`${API_URL}/api/auth/guest`, {
           method: "POST",
+          credentials: "include",
         });
 
         if (!response.ok) {
@@ -79,14 +86,14 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const data: {
-          userId: string;
-          userName: string;
+          user: {
+            id: string;
+            name: string;
+          };
         } = await response.json();
 
-        sessionStorage.setItem("mink-gomoku-user-id", data.userId);
-
-        setUserId(data.userId);
-        setUserName(data.userName);
+        setUserId(data.user.id);
+        setUserName(data.user.name);
 
         break;
       }
@@ -99,8 +106,6 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    sessionStorage.removeItem("mink-gomoku-user-id");
-    sessionStorage.removeItem("mink-gomoku-user-name");
     setUserId(null);
     await fetch(`${API_URL}/api/auth/logout`, {
       method: "POST",
@@ -117,7 +122,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         userName,
         setUserName,
         updateUserName,
-        loading,
+        initialized,
         userId,
         isLogged: userId !== null,
         login,

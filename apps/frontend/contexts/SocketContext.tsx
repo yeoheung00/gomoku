@@ -19,13 +19,13 @@ interface SocketContextType {
 const SocketContext = createContext<SocketContextType | null>(null);
 
 export default function SocketProvider({ children }: { children: ReactNode }) {
-  const { isLogged, userId, loading } = useAuth();
+  const { isLogged, userId, initialized } = useAuth();
 
   const [isConnected, setIsConnected] = useState(socket.connected);
 
   useEffect(() => {
     // AuthContext가 sessionStorage 확인을 끝낼 때까지 대기
-    if (!loading) return;
+    if (!initialized) return;
 
     const handleConnect = () => {
       console.log(`🔌 소켓 연결 성공: ${socket.id}`);
@@ -43,7 +43,6 @@ export default function SocketProvider({ children }: { children: ReactNode }) {
     socket.on("disconnect", handleDisconnect);
 
     if (isLogged && userId) {
-      // 연결 과정에서 서버에 사용자 ID 전달
       socket.auth = {
         userId,
       };
@@ -61,7 +60,7 @@ export default function SocketProvider({ children }: { children: ReactNode }) {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
     };
-  }, [loading, isLogged, userId]);
+  }, [initialized, isLogged, userId]);
 
   return (
     <SocketContext.Provider
