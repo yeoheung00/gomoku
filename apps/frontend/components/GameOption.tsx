@@ -9,7 +9,9 @@ export default function GameOption({ onStatus }: GameOptionProps) {
   const handleQuickMatch = () => {
     if (!isConnected) return;
     onStatus("quick");
-    socket.emit("quick-match");
+    socket.emit("quick-match", (response: {status: string, msg: string}) => {
+      console.log(response.status, response.msg);
+    });
   };
   const handlePrivateRoom = () => {
     if (!isConnected) return;

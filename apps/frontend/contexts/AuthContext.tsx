@@ -50,16 +50,14 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     initAccount();
   }, []);
 
-  useEffect(() => {
-    if (userId?.startsWith("gst_")) return;
-    //TODO: 게스트가 아니라면 유저 이름 DB 수정
-  }, [userName]);
-
   const updateUserName = async (name: string) => {
     if (!userId) return;
 
     const response = await fetch(`${API_URL}/api/users/me/name`, {
       method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify({ name }),
       credentials: "include",
     });
@@ -70,10 +68,10 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data.reason);
     }
 
-    setUserName(data.userName);
+    setUserName(data.name);
   };
 
-  const login = async (option: string) => {
+  const login = async (option: string, autoLogin: boolean) => {
     switch (option) {
       case "guest": {
         const response = await fetch(`${API_URL}/api/auth/guest`, {
@@ -106,14 +104,15 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    setUserId(null);
-    await fetch(`${API_URL}/api/auth/logout`, {
+    const response = await fetch(`${API_URL}/api/auth/logout`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ userId }),
+      credentials: "include",
     });
+    if (!response.ok) {
+      throw new Error("로그아웃 실패");
+    }
+    setUserId(null);
+    setUserName(null);
   };
 
   return (

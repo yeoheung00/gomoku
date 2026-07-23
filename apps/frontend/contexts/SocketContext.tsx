@@ -23,6 +23,16 @@ export default function SocketProvider({ children }: { children: ReactNode }) {
 
   const [isConnected, setIsConnected] = useState(socket.connected);
 
+  const connectSocket = async() => {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/check-auth`,
+      {
+        method: "GET",
+        credentials: "include",
+      }
+    );
+    if (response.ok) socket.connect();
+  }
+
   useEffect(() => {
     // AuthContext가 sessionStorage 확인을 끝낼 때까지 대기
     if (!initialized) return;
@@ -48,7 +58,7 @@ export default function SocketProvider({ children }: { children: ReactNode }) {
       };
 
       if (!socket.connected) {
-        socket.connect();
+        connectSocket();
       }
     } else {
       if (socket.connected) {
