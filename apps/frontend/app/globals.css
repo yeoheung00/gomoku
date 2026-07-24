@@ -2,7 +2,20 @@
 
 @theme {
     --color-stone-black: rgba(50, 50, 50, 1);
-    --shadow-stone-black: 2px 2px 4px 1px rgba(0, 0, 0, 0.5), 2px 2px 8px 1px rgba(75, 75, 75, 1) inset, -2px -2px 8px 1px rgba(25, 25, 25, 1) inset;
+    --shadow-stone-black:
+        2px 2px 4px 1px rgba(0, 0, 0, 0.5),
+        2px 2px 8px 1px rgba(75, 75, 75, 1) inset,
+        -2px -2px 8px 1px rgba(25, 25, 25, 1) inset;
     --color-stone-white: rgba(225, 225, 225, 1);
-    --shadow-stone-white: 2px 2px 4px 1px rgba(0, 0, 0, 0.5), 2px 2px 8px 1px rgba(250, 250, 250, 1) inset, -2px -2px 8px 1px rgba(200, 200, 200, 1) inset;
+    --shadow-stone-white:
+        2px 2px 4px 1px rgba(0, 0, 0, 0.5),
+        2px 2px 8px 1px rgba(250, 250, 250, 1) inset,
+        -2px -2px 8px 1px rgba(200, 200, 200, 1) inset;
+}
+
+body {
+    -ms-overflow-style: none;
+}
+::-webkit-scrollbar {
+    display: none;
 }

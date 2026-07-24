@@ -56,7 +56,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     const response = await fetch(`${API_URL}/api/users/me/name`, {
       method: "PATCH",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ name }),
       credentials: "include",
